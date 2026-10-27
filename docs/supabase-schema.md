@@ -255,6 +255,7 @@ Recommended policy summary:
 - `student_academic_records`: staff can read; admin can write
 - `service_records`: staff can read; service-record writes go through the server-side submission function
 - `service_record_items`: staff can read; service-record writes go through the server-side submission function
+- Deleting a service record: admin-only `delete_service_record` RPC; the database records the deletion in `audit_logs`, and related item rows are removed by the foreign-key cascade
 - `users`: only admin/staff can read own profile and list if allowed
 - `audit_logs`: admin only
 

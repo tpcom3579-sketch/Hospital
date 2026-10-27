@@ -1,10 +1,30 @@
-import { getServiceRecords, getStudentDirectory } from './browserDataStore'
+import { getServiceRecords, getStudentDirectory, saveServiceRecords } from './browserDataStore'
 import { getLocalDateKey } from '../lib/dateUtils'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import type { ServiceRecord, Student } from '../types'
 
 export type ServiceHistoryRecord = ServiceRecord & { student?: Student }
 export type ServiceHistoryPage = { records: ServiceHistoryRecord[]; total: number }
+
+export async function deleteServiceRecord(recordId: number): Promise<void> {
+  if (!Number.isSafeInteger(recordId) || recordId < 1) {
+    throw new Error('รหัสประวัติไม่ถูกต้อง')
+  }
+
+  if (isSupabaseConfigured && supabase) {
+    const { error } = await supabase.rpc('delete_service_record', { p_record_id: recordId })
+    if (error?.code === '42501') throw new Error('เฉพาะ Admin เท่านั้นที่ลบประวัติได้')
+    if (error?.code === 'P0002') throw new Error('ไม่พบประวัติที่ต้องการลบ อาจถูกลบไปแล้ว')
+    if (error) throw new Error('ลบประวัติไม่สำเร็จ กรุณาลองใหม่')
+    return
+  }
+
+  const records = getServiceRecords()
+  if (!records.some((record) => record.id === recordId)) {
+    throw new Error('ไม่พบประวัติที่ต้องการลบ')
+  }
+  saveServiceRecords(records.filter((record) => record.id !== recordId))
+}
 
 type ServiceHistoryRow = {
   id: number

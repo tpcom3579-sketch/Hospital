@@ -1,8 +1,11 @@
+import { Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { AdminLayout } from '../../components/layout/AdminLayout'
+import { Button } from '../../components/ui/Button'
 import { noteOptions, symptomOptions } from '../../data/mockData'
 import { getLocalDateKey } from '../../lib/dateUtils'
-import { getServiceHistory } from '../../services/studentRepository'
+import { getActiveStaffProfile } from '../../services/authService'
+import { deleteServiceRecord, getServiceHistory } from '../../services/studentRepository'
 import type { ServiceHistoryRecord } from '../../services/studentRepository'
 
 const symptomLabels = new Map(symptomOptions.map((item) => [item.id, item.label]))
@@ -31,6 +34,10 @@ function AdminHistoryPage() {
   const [serviceRecords, setServiceRecords] = useState<ServiceHistoryRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [canDelete, setCanDelete] = useState(false)
+  const [deletingRecordId, setDeletingRecordId] = useState<number | null>(null)
+  const [deleteError, setDeleteError] = useState('')
+  const [deleteMessage, setDeleteMessage] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [studentId, setStudentId] = useState('')
@@ -40,14 +47,43 @@ function AdminHistoryPage() {
 
   useEffect(() => {
     let active = true
-    void getServiceHistory()
-      .then((records) => { if (active) setServiceRecords(records) })
+    void Promise.all([getServiceHistory(), getActiveStaffProfile()])
+      .then(([records, profile]) => {
+        if (!active) return
+        setServiceRecords(records)
+        setCanDelete(profile?.role === 'admin')
+      })
       .catch(() => { if (active) setError('โหลดประวัติการใช้บริการไม่สำเร็จ') })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [])
 
+  async function handleDeleteRecord(record: ServiceHistoryRecord) {
+    if (!canDelete || deletingRecordId !== null) return
+
+    const studentName = record.student ? `${record.student.name} ${record.student.surname}` : record.student_id
+    const serviceDate = new Date(record.service_datetime).toLocaleString('th-TH')
+    const confirmed = window.confirm(
+      `ยืนยันลบประวัติของ ${studentName} (รหัส ${record.student_id}) วันที่ ${serviceDate} หรือไม่?\n\nรายการนี้จะถูกลบจากฐานข้อมูลอย่างถาวร ส่วนไฟล์สำรองประจำปีที่สร้างไว้ก่อนหน้านี้จะไม่เปลี่ยนแปลง`,
+    )
+    if (!confirmed) return
+
+    setDeletingRecordId(record.id)
+    setDeleteError('')
+    setDeleteMessage('')
+    try {
+      await deleteServiceRecord(record.id)
+      setServiceRecords((currentRecords) => currentRecords.filter((item) => item.id !== record.id))
+      setDeleteMessage(`ลบประวัติรหัสนักเรียน ${record.student_id} แล้ว`)
+    } catch (cause) {
+      setDeleteError(cause instanceof Error ? cause.message : 'ลบประวัติไม่สำเร็จ กรุณาลองใหม่')
+    } finally {
+      setDeletingRecordId(null)
+    }
+  }
+
   const invalidDateRange = Boolean(dateFrom && dateTo && dateFrom > dateTo)
+  const columnCount = canDelete ? 8 : 7
   const normalizedStudentId = studentId.trim().toLocaleLowerCase()
   const classLevels = [...new Set(serviceRecords.map((record) => {
     const className = record.student?.class_name ?? ''
@@ -126,18 +162,19 @@ function AdminHistoryPage() {
                   <th className="px-4 py-3">ชั้น</th>
                   <th className="px-4 py-3">อาการ</th>
                   <th className="px-4 py-3">หมายเหตุ</th>
+                  {canDelete ? <th className="px-4 py-3">จัดการ</th> : null}
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-500">กำลังโหลดประวัติ...</td></tr>
+                  <tr><td colSpan={columnCount} className="px-4 py-10 text-center text-slate-500">กำลังโหลดประวัติ...</td></tr>
                 ) : error ? (
-                  <tr><td colSpan={7} role="alert" className="px-4 py-10 text-center text-rose-700">{error}</td></tr>
+                  <tr><td colSpan={columnCount} role="alert" className="px-4 py-10 text-center text-rose-700">{error}</td></tr>
                 ) : invalidDateRange ? (
-                  <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-500">โปรดแก้ไขช่วงวันที่</td></tr>
+                  <tr><td colSpan={columnCount} className="px-4 py-10 text-center text-slate-500">โปรดแก้ไขช่วงวันที่</td></tr>
                 ) : filteredRecords.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-10 text-center text-slate-500">
+                    <td colSpan={columnCount} className="px-4 py-10 text-center text-slate-500">
                       {serviceRecords.length === 0 ? 'ยังไม่มีประวัติการใช้บริการ' : 'ไม่พบรายการตามตัวกรอง'}
                     </td>
                   </tr>
@@ -164,6 +201,21 @@ function AdminHistoryPage() {
                           )) : <span className="text-slate-400">-</span>}
                         </div>
                       </td>
+                      {canDelete ? (
+                        <td className="px-4 py-3">
+                          <Button
+                            type="button"
+                            variant="danger"
+                            className="gap-2 px-3 py-2"
+                            disabled={deletingRecordId !== null}
+                            aria-label={`ลบประวัติรหัสนักเรียน ${record.student_id}`}
+                            onClick={() => void handleDeleteRecord(record)}
+                          >
+                            <Trash2 size={16} />
+                            {deletingRecordId === record.id ? 'กำลังลบ...' : 'ลบ'}
+                          </Button>
+                        </td>
+                      ) : null}
                     </tr>
                   )
                 })}
@@ -171,6 +223,8 @@ function AdminHistoryPage() {
             </table>
           </div>
         </div>
+        {deleteError ? <p role="alert" className="text-sm text-rose-700">{deleteError}</p> : null}
+        {deleteMessage ? <p role="status" className="text-sm text-emerald-700">{deleteMessage}</p> : null}
       </div>
     </AdminLayout>
   )
