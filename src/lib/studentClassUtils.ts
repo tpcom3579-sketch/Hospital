@@ -10,8 +10,14 @@ type ParsedClass = {
   roomType: RoomType
 }
 
+export type StudentClassFilterOption = {
+  value: string
+  label: string
+}
+
 const classPattern = /^(?:ม\.?\s*)?([1-6])\s*\/\s*(.+)$/i
 const letterRoomPattern = /^[A-Z][A-Z0-9_-]*$/i
+const roomTypeOrder: Record<RoomType, number> = { number: 0, letter: 1, other: 2 }
 
 export function parseStudentClass(className: string): ParsedClass {
   const match = className.trim().match(classPattern)
@@ -37,9 +43,47 @@ export function getStudentRoomFilter(className: string): string {
   return room ?? OTHER_CLASS_FILTER
 }
 
+export function getStudentClassLevelOptions(students: Student[]): StudentClassFilterOption[] {
+  const options = Array.from({ length: 6 }, (_, index) => ({
+    value: String(index + 1),
+    label: `ม.${index + 1}`,
+  }))
+  if (students.some((student) => getStudentLevelFilter(student.class_name) === OTHER_CLASS_FILTER)) {
+    options.push({ value: OTHER_CLASS_FILTER, label: 'อื่นๆ' })
+  }
+  return options
+}
+
+export function getStudentClassRoomOptions(
+  students: Student[],
+  selectedLevel: string,
+): StudentClassFilterOption[] {
+  const rooms = new Map<string, ParsedClass>()
+  for (const student of students) {
+    if (selectedLevel && getStudentLevelFilter(student.class_name) !== selectedLevel) continue
+    const parsedClass = parseStudentClass(student.class_name)
+    rooms.set(getStudentRoomFilter(student.class_name), parsedClass)
+  }
+
+  return [...rooms.entries()]
+    .map(([value, parsedClass]) => ({
+      value,
+      label: value === OTHER_CLASS_FILTER ? 'อื่นๆ' : value,
+      parsedClass,
+    }))
+    .sort((first, second) => {
+      const typeComparison = roomTypeOrder[first.parsedClass.roomType] - roomTypeOrder[second.parsedClass.roomType]
+      if (typeComparison !== 0) return typeComparison
+      if (first.parsedClass.roomType === 'number' && second.parsedClass.roomType === 'number') {
+        return Number(first.value) - Number(second.value)
+      }
+      return first.label.localeCompare(second.label, 'en', { numeric: true, sensitivity: 'base' })
+    })
+    .map(({ value, label }) => ({ value, label }))
+}
+
 function compareRooms(first: ParsedClass, second: ParsedClass): number {
-  const roomOrder: Record<RoomType, number> = { number: 0, letter: 1, other: 2 }
-  const typeComparison = roomOrder[first.roomType] - roomOrder[second.roomType]
+  const typeComparison = roomTypeOrder[first.roomType] - roomTypeOrder[second.roomType]
   if (typeComparison !== 0) return typeComparison
   if (first.roomType === 'number' && second.roomType === 'number') {
     return Number(first.room) - Number(second.room)

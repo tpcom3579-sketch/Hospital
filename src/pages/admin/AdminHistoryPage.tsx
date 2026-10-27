@@ -4,6 +4,12 @@ import { AdminLayout } from '../../components/layout/AdminLayout'
 import { Button } from '../../components/ui/Button'
 import { noteOptions, symptomOptions } from '../../data/mockData'
 import { getLocalDateKey } from '../../lib/dateUtils'
+import {
+  getStudentClassLevelOptions,
+  getStudentClassRoomOptions,
+  getStudentLevelFilter,
+  getStudentRoomFilter,
+} from '../../lib/studentClassUtils'
 import { getActiveStaffProfile } from '../../services/authService'
 import { deleteServiceRecord, getServiceHistory } from '../../services/studentRepository'
 import type { ServiceHistoryRecord } from '../../services/studentRepository'
@@ -85,25 +91,14 @@ function AdminHistoryPage() {
   const invalidDateRange = Boolean(dateFrom && dateTo && dateFrom > dateTo)
   const columnCount = canDelete ? 8 : 7
   const normalizedStudentId = studentId.trim().toLocaleLowerCase()
-  const classLevels = [...new Set(serviceRecords.map((record) => {
-    const className = record.student?.class_name ?? ''
-    const classMatch = className.match(/ม\.\s*\d+/)
-    return classMatch ? classMatch[0].replace(/\s+/g, ' ') : ''
-  }).filter(Boolean))].sort((first, second) => first.localeCompare(second, 'th'))
-  const classRooms = [...new Set(serviceRecords
-    .filter((record) => !selectedLevel || (record.student?.class_name ?? '').includes(selectedLevel))
-    .map((record) => {
-      const className = record.student?.class_name ?? ''
-      const roomMatch = className.match(/\/\s*(\d+)/)
-      return roomMatch ? roomMatch[1] : ''
-    }).filter(Boolean))].sort((first, second) => Number(first) - Number(second))
+  const studentsWithHistory = serviceRecords.flatMap((record) => record.student ? [record.student] : [])
+  const classLevels = getStudentClassLevelOptions(studentsWithHistory)
+  const classRooms = getStudentClassRoomOptions(studentsWithHistory, selectedLevel)
   const filteredRecords = serviceRecords.filter((record) => {
     const className = record.student?.class_name ?? ''
-    const recordLevel = className.match(/ม\.\s*\d+/)?.[0].replace(/\s+/g, ' ') ?? ''
-    const recordRoom = className.match(/\/\s*(\d+)/)?.[1] ?? ''
     const recordDate = getLocalDateKey(new Date(record.service_datetime))
-    const matchesLevel = !selectedLevel || recordLevel === selectedLevel
-    const matchesRoom = !selectedRoom || recordRoom === selectedRoom
+    const matchesLevel = !selectedLevel || getStudentLevelFilter(className) === selectedLevel
+    const matchesRoom = !selectedRoom || getStudentRoomFilter(className) === selectedRoom
     return (!dateFrom || recordDate >= dateFrom)
       && (!dateTo || recordDate <= dateTo)
       && (!normalizedStudentId || record.student_id.toLocaleLowerCase().includes(normalizedStudentId))
@@ -130,7 +125,7 @@ function AdminHistoryPage() {
               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm"
             >
               <option value="">ทุกระดับชั้น</option>
-              {classLevels.map((level) => <option key={level} value={level}>{level}</option>)}
+              {classLevels.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
             </select>
             <select
               aria-label="ห้อง"
@@ -139,7 +134,7 @@ function AdminHistoryPage() {
               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-60"
             >
               <option value="">ทุกห้อง</option>
-              {classRooms.map((room) => <option key={room} value={room}>{room}</option>)}
+              {classRooms.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
             </select>
             <select aria-label="เพศ" value={sex} onChange={(event) => setSex(event.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm">
               <option value="">เพศ</option>

@@ -105,6 +105,7 @@ export async function previewStudentImport(file: File, defaultAcademicYear: stri
     if (!values || values.every((value) => cellText(value) === '')) continue
 
     const valueAt = (field: ImportField): unknown => values[indexes[field] as number]
+    if (cellText(valueAt('number')) === 'ตัวอย่าง (ลบก่อนนำเข้า)') continue
     const studentId = normalizeStudentId(valueAt('studentId'))
     const number = Number(cellText(valueAt('number')))
     const sex = normalizeSex(valueAt('sex'))

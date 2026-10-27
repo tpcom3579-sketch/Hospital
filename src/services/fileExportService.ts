@@ -97,6 +97,9 @@ export async function downloadStudentTemplate(academicYear: string): Promise<voi
     [`ตารางรายชื่อนักเรียนปี ${academicYear}`, null, null, null, null, null],
     [null, null, null, null, null, null],
     ['Number', 'Student_ID', 'Sex', 'Name', 'Surname', 'Class'],
+    ['ตัวอย่าง (ลบก่อนนำเข้า)', '30001', 'ชาย', 'ชื่อจริง', 'นามสกุล', 'ม.1/4'],
+    ['ตัวอย่าง (ลบก่อนนำเข้า)', '30002', 'หญิง', 'ชื่อจริง', 'นามสกุล', '1/7'],
+    ['ตัวอย่าง (ลบก่อนนำเข้า)', '30003', 'ชาย', 'ชื่อจริง', 'นามสกุล', 'ม.1/SMTE'],
   ]
   await writeXlsxFile(rows, { sheet: 'Students' }).toFile('student-import-template.xlsx')
 }
@@ -658,4 +661,3 @@ function escapeHtml(value: string | number): string {
     "'": '&#39;',
   })[character] ?? character)
 }
-

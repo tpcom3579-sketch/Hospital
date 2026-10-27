@@ -163,6 +163,12 @@ function AdminImportPage() {
                     </Button>
                   </div>
                 </div>
+                <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 p-3 text-left text-xs leading-relaxed text-blue-900 sm:text-sm">
+                  <p className="font-semibold">ตัวอย่างข้อมูลแต่ละคอลัมน์ในไฟล์แม่แบบ</p>
+                  <p className="mt-1">Number: 1 · Student_ID: 30001 · Sex: ชาย หรือ หญิง · Name: ชื่อจริง · Surname: นามสกุล</p>
+                  <p>Class: ม.1/4, 1/7 หรือ ม.1/SMTE (ให้มี / คั่นระหว่างชั้นกับห้อง)</p>
+                  <p className="mt-1">แถวที่ขึ้นต้นว่า “ตัวอย่าง (ลบก่อนนำเข้า)” เป็นข้อมูลสาธิต ระบบจะข้ามให้อัตโนมัติ</p>
+                </div>
               </div>
               {error ? <ErrorMessage message={error} /> : null}
             </div>
