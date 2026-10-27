@@ -3,6 +3,13 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AdminLayout } from '../../components/layout/AdminLayout'
 import { Button } from '../../components/ui/Button'
+import {
+  compareStudentsByClass,
+  getStudentLevelFilter,
+  getStudentRoomFilter,
+  OTHER_CLASS_FILTER,
+  parseStudentClass,
+} from '../../lib/studentClassUtils'
 import { getCurrentStudentRoster } from '../../services/studentRepository'
 import type { Student } from '../../types'
 
@@ -27,33 +34,48 @@ function AdminStudentsPage() {
     return () => { active = false }
   }, [])
 
-  const classLevels = [...new Set(studentDirectory.map((student) => {
-    const classMatch = student.class_name.match(/ม\.\s*\d+/)
-    return classMatch ? classMatch[0].replace(/\s+/g, ' ') : ''
-  }).filter(Boolean))].sort((first, second) => first.localeCompare(second, 'th'))
-  const classRooms = [...new Set(studentDirectory
-    .filter((student) => !selectedLevel || student.class_name.includes(selectedLevel))
-    .map((student) => {
-      const roomMatch = student.class_name.match(/\/\s*(\d+)/)
-      return roomMatch ? roomMatch[1] : ''
-    }).filter(Boolean))].sort((first, second) => Number(first) - Number(second))
+  const hasUnclassifiedLevel = studentDirectory.some((student) =>
+    getStudentLevelFilter(student.class_name) === OTHER_CLASS_FILTER,
+  )
+  const classLevels = [
+    ...Array.from({ length: 6 }, (_, index) => String(index + 1)),
+    ...(hasUnclassifiedLevel ? [OTHER_CLASS_FILTER] : []),
+  ]
+  const roomMap = new Map<string, { value: string; label: string; sortClass: ReturnType<typeof parseStudentClass> }>()
+  for (const student of studentDirectory) {
+    if (selectedLevel && getStudentLevelFilter(student.class_name) !== selectedLevel) continue
+    const parsedClass = parseStudentClass(student.class_name)
+    const roomValue = getStudentRoomFilter(student.class_name)
+    roomMap.set(roomValue, {
+      value: roomValue,
+      label: roomValue === OTHER_CLASS_FILTER ? 'อื่นๆ' : roomValue,
+      sortClass: parsedClass,
+    })
+  }
+  const roomOrder = { number: 0, letter: 1, other: 2 }
+  const classRooms = [...roomMap.values()].sort((first, second) => {
+    const typeOrder = roomOrder[first.sortClass.roomType] - roomOrder[second.sortClass.roomType]
+    if (typeOrder !== 0) return typeOrder
+    if (first.sortClass.roomType === 'number' && second.sortClass.roomType === 'number') {
+      return Number(first.value) - Number(second.value)
+    }
+    return first.label.localeCompare(second.label, 'en', { numeric: true, sensitivity: 'base' })
+  })
   const normalizedSearch = search.trim().toLocaleLowerCase()
   const filteredStudents = studentDirectory.filter((student) => {
-    const studentLevel = student.class_name.match(/ม\.\s*\d+/)?.[0].replace(/\s+/g, ' ') ?? ''
-    const studentRoom = student.class_name.match(/\/\s*(\d+)/)?.[1] ?? ''
     const matchesSearch = !normalizedSearch || [
       student.student_id,
       student.name,
       student.surname,
       `${student.name} ${student.surname}`,
     ].some((value) => value.toLocaleLowerCase().includes(normalizedSearch))
-    const matchesLevel = !selectedLevel || studentLevel === selectedLevel
-    const matchesRoom = !selectedRoom || studentRoom === selectedRoom
+    const matchesLevel = !selectedLevel || getStudentLevelFilter(student.class_name) === selectedLevel
+    const matchesRoom = !selectedRoom || getStudentRoomFilter(student.class_name) === selectedRoom
     return matchesSearch
       && matchesLevel
       && matchesRoom
       && (!selectedSex || student.sex === selectedSex)
-  })
+  }).sort(compareStudentsByClass)
   const pageCount = Math.max(1, Math.ceil(filteredStudents.length / pageSize))
   const pagedStudents = filteredStudents.slice((page - 1) * pageSize, page * pageSize)
 
@@ -89,7 +111,11 @@ function AdminStudentsPage() {
               className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             >
               <option value="">ทุกระดับชั้น</option>
-              {classLevels.map((level) => <option key={level} value={level}>{level}</option>)}
+              {classLevels.map((level) => (
+                <option key={level} value={level}>
+                  {level === OTHER_CLASS_FILTER ? 'อื่นๆ' : `ม.${level}`}
+                </option>
+              ))}
             </select>
             <select
               aria-label="กรองตามห้อง"
@@ -98,7 +124,7 @@ function AdminStudentsPage() {
               className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             >
               <option value="">ทุกห้อง</option>
-              {classRooms.map((room) => <option key={room} value={room}>{room}</option>)}
+              {classRooms.map((room) => <option key={room.value} value={room.value}>{room.label}</option>)}
             </select>
             <select
               aria-label="กรองตามเพศ"
