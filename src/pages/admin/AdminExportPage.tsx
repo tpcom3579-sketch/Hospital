@@ -184,7 +184,7 @@ function AdminExportPage() {
                 </select>
               </label>
               <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-600">
-                เทอม 1: พ.ค. – ต.ค.<br />เทอม 2: พ.ย. – มี.ค.
+                เทอม 1: พ.ค. – ก.ย.<br />เทอม 2: ต.ค. – มี.ค.
               </div>
             </div>
             {availabilityChecking || statisticsChecking ? <p role="status" className="mt-4 text-sm text-slate-500">กำลังตรวจสอบข้อมูลปีการศึกษา...</p> : null}

@@ -1,10 +1,112 @@
-import { getServiceRecords, getStudentDirectory, saveServiceRecords } from './browserDataStore'
+import {
+  getServiceRecords,
+  getArchivedStudentDirectory,
+  getHistoricalStudentDirectory,
+  getStudentDirectory,
+  saveArchivedStudentDirectory,
+  saveServiceRecords,
+  saveStudentDirectory,
+} from './browserDataStore'
 import { getLocalDateKey } from '../lib/dateUtils'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import type { ServiceRecord, Student } from '../types'
 
 export type ServiceHistoryRecord = ServiceRecord & { student?: Student }
 export type ServiceHistoryPage = { records: ServiceHistoryRecord[]; total: number }
+export type StudentAcademicRecordUpdate = Pick<
+  Student,
+  'number' | 'student_id' | 'name' | 'surname' | 'sex' | 'class_name' | 'academic_year'
+>
+
+function validateStudentUpdate(student: StudentAcademicRecordUpdate): StudentAcademicRecordUpdate {
+  const normalized = {
+    ...student,
+    student_id: student.student_id.trim(),
+    name: student.name.trim(),
+    surname: student.surname.trim(),
+    class_name: student.class_name.trim(),
+    academic_year: student.academic_year.trim(),
+  }
+  if (!/^\d{5}$/.test(normalized.student_id)) throw new Error('รหัสนักเรียนต้องเป็นตัวเลข 5 หลัก')
+  if (!Number.isSafeInteger(normalized.number) || normalized.number < 1) throw new Error('เลขที่ต้องเป็นจำนวนเต็มตั้งแต่ 1 ขึ้นไป')
+  if (!normalized.name || !normalized.surname || !normalized.class_name) throw new Error('กรุณากรอกชื่อ นามสกุล และชั้นให้ครบ')
+  if (normalized.sex !== 'ชาย' && normalized.sex !== 'หญิง') throw new Error('เพศไม่ถูกต้อง')
+  if (!/^\d{4}$/.test(normalized.academic_year)) throw new Error('ปีการศึกษาต้องเป็นตัวเลข 4 หลัก')
+  return normalized
+}
+
+export async function updateStudentAcademicRecord(
+  originalStudent: Student,
+  studentUpdate: StudentAcademicRecordUpdate,
+): Promise<Student> {
+  const updated = validateStudentUpdate(studentUpdate)
+  const originalStudentId = originalStudent.student_id
+
+  if (isSupabaseConfigured && supabase) {
+    const { error } = await supabase.rpc('update_student_academic_record', {
+      p_original_student_id: originalStudentId,
+      p_student_id: updated.student_id,
+      p_number: updated.number,
+      p_sex: updated.sex,
+      p_name: updated.name,
+      p_surname: updated.surname,
+      p_class: updated.class_name,
+      p_academic_year: updated.academic_year,
+    })
+    if (error?.code === '42501') throw new Error('เฉพาะ Admin เท่านั้นที่แก้ไขข้อมูลนักเรียนได้')
+    if (error?.code === 'P0002') throw new Error('ไม่พบรายชื่อนักเรียนที่ต้องการแก้ไข')
+    if (error?.code === '23505') {
+      if (error.message.includes('student_academic_records_student_year_key')) {
+        throw new Error('ปีการศึกษานี้มีข้อมูลของนักเรียนอยู่แล้ว')
+      }
+      throw new Error('รหัสนักเรียนนี้มีอยู่ในระบบแล้ว')
+    }
+    if (error) throw new Error('บันทึกข้อมูลนักเรียนไม่สำเร็จ กรุณาลองใหม่')
+  } else {
+    const students = getStudentDirectory()
+    const currentStudent = students.find((student) => student.student_id === originalStudentId)
+    if (!currentStudent) throw new Error('ไม่พบรายชื่อนักเรียนที่ต้องการแก้ไข')
+    if (updated.student_id !== originalStudentId && students.some((student) => student.student_id === updated.student_id)) {
+      throw new Error('รหัสนักเรียนนี้มีอยู่ในระบบแล้ว')
+    }
+
+    const status = currentStudent.status
+    saveStudentDirectory(students.map((student) => student.student_id === originalStudentId
+      ? { ...updated, status }
+      : student))
+    if (updated.student_id !== originalStudentId) {
+      saveServiceRecords(getServiceRecords().map((record) =>
+        record.student_id === originalStudentId ? { ...record, student_id: updated.student_id } : record,
+      ))
+    }
+  }
+
+  return { ...updated, status: originalStudent.status }
+}
+
+export async function removeStudentFromRoster(studentId: string): Promise<void> {
+  if (isSupabaseConfigured && supabase) {
+    const { error } = await supabase.rpc('remove_student_from_roster', {
+      p_student_id: studentId,
+    })
+    if (error?.code === '42501') throw new Error('เฉพาะ Admin เท่านั้นที่ลบรายชื่อนักเรียนได้')
+    if (error?.code === 'P0002') throw new Error('ไม่พบรายชื่อนักเรียนที่ต้องการลบ')
+    if (error) throw new Error('ลบรายชื่อนักเรียนไม่สำเร็จ กรุณาลองใหม่')
+    return
+  }
+
+  const students = getStudentDirectory()
+  const removedStudent = students.find((student) => student.student_id === studentId)
+  if (!removedStudent) {
+    throw new Error('ไม่พบรายชื่อนักเรียนที่ต้องการลบ')
+  }
+  saveStudentDirectory(students.filter((student) => student.student_id !== studentId))
+  const archivedStudents = getArchivedStudentDirectory()
+  saveArchivedStudentDirectory([
+    ...archivedStudents.filter((student) => student.student_id !== studentId),
+    removedStudent,
+  ])
+}
 
 export async function deleteServiceRecord(recordId: number): Promise<void> {
   if (!Number.isSafeInteger(recordId) || recordId < 1) {
@@ -121,7 +223,7 @@ export async function getCurrentStudentRoster(): Promise<Student[]> {
 
 export async function getServiceHistory(): Promise<ServiceHistoryRecord[]> {
   if (!isSupabaseConfigured || !supabase) {
-    const studentsById = new Map(getStudentDirectory().map((student) => [student.student_id, student]))
+    const studentsById = new Map(getHistoricalStudentDirectory().map((student) => [student.student_id, student]))
     return getServiceRecords().map((record) => ({ ...record, student: studentsById.get(record.student_id) }))
   }
 

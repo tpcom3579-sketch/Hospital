@@ -1,4 +1,9 @@
-import { getServiceRecords, getStudentDirectory, saveServiceRecords } from './browserDataStore'
+import {
+  getHistoricalStudentDirectory,
+  getServiceRecords,
+  getStudentDirectory,
+  saveServiceRecords,
+} from './browserDataStore'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import type { ServiceRecord, Student } from '../types'
 
@@ -65,7 +70,7 @@ export const createServiceRecord = async (studentId: string, selectedItems: stri
 }
 
 export const getRecentActivity = () => {
-  const students = getStudentDirectory()
+  const students = getHistoricalStudentDirectory()
 
   return getServiceRecords().slice(0, 8).map((record) => {
     const student = students.find((item) => item.student_id === record.student_id)
@@ -87,7 +92,7 @@ export const getStudentMetrics = () => {
 }
 
 export const getServiceSummary = () => {
-  const students = getStudentDirectory()
+  const students = getHistoricalStudentDirectory()
   const serviceRecords = getServiceRecords()
   const total = serviceRecords.length
   const male = serviceRecords.filter((record) => {

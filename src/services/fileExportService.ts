@@ -131,8 +131,8 @@ const symptomLabels = [
 ]
 const reportSymptoms = symptomOptions.map((option, index) => ({ ...option, reportLabel: symptomLabels[index] }))
 const monthLabels = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
-const termOneMonths = [5, 6, 7, 8, 9, 10]
-const termTwoMonths = [11, 12, 1, 2, 3]
+const termOneMonths = [5, 6, 7, 8, 9]
+const termTwoMonths = [10, 11, 12, 1, 2, 3]
 const termOneNoteIds = ['rest', 'accident', 'go_home', 'send_hospital', 'return_class']
 const termTwoNoteIds = ['rest', 'accident', 'go_home', 'other', 'send_hospital', 'return_class']
 

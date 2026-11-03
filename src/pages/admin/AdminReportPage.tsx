@@ -33,7 +33,7 @@ function AdminReportPage() {
               <option value="2568">ปีการศึกษา 2568</option>
               <option value="2569">ปีการศึกษา 2569</option>
             </select>
-            <p className="text-sm text-slate-500">เทอม 1: พฤษภาคม–ตุลาคม · เทอม 2: พฤศจิกายน–มีนาคม</p>
+            <p className="text-sm text-slate-500">เทอม 1: พฤษภาคม–กันยายน · เทอม 2: ตุลาคม–มีนาคม</p>
           </div>
 
           <div className="mt-6 grid gap-6 xl:grid-cols-2">

@@ -2,7 +2,7 @@
 
 ## 1. Local App Keys
 
-In the Supabase Dashboard, open the project settings and copy the Project URL and publishable/anon key into the ignored `.env.local` file:
+In the Supabase Dashboard, open the project settings and copy the Project URL and publishable/anon key into the ignored `.env` or `.env.local` file:
 
 ```env
 VITE_SUPABASE_URL=https://<project-ref>.supabase.co
@@ -23,6 +23,7 @@ Apply migrations in order from the Supabase SQL Editor or the Supabase CLI:
 6. `supabase/migrations/202609290003_service_record_permissions.sql`
 7. `supabase/migrations/202609300001_incremental_student_roster_import.sql`
 8. `supabase/migrations/202610270001_admin_delete_service_record.sql`
+9. `supabase/migrations/202611030001_manage_student_roster.sql`
 
 The second migration archives the previously active academic records and upserts the new roster in one transaction. Old academic records and service records remain available for reports and history.
 The fourth migration creates the public-report setting (disabled by default), private annual archive storage, and the admin-only roster archive function.
@@ -30,6 +31,7 @@ The fifth migration adds “กลับห้องเรียน” to the se
 The sixth migration makes service history read-only for authenticated users; writes remain available through the server-side submission function.
 The seventh migration allows the active roster to be imported in batches during the same academic year, while the first batch of a new year still rolls over records from the previous year.
 The eighth migration adds an admin-only RPC for deleting an individual service record and records the action in `audit_logs`.
+The ninth migration adds audited admin actions for editing active student records and removing students from the active roster without deleting their service history. It also enables safe student-ID updates across historical references.
 
 ## 3. First Admin Account
 
